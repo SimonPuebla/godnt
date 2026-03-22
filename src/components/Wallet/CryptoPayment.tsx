@@ -147,7 +147,7 @@ export default function CryptoPayment({
         >
           {isTreasury
             ? `Fund treasury — ${formatPrice(amountUsdc)} USDC`
-            : `Pay & submit — ${formatPrice(amountUsdc)} USDC`}
+            : `Send argument — ${formatPrice(amountUsdc)} USDC`}
         </button>
       )}
     </div>

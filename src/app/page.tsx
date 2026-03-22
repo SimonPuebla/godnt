@@ -13,11 +13,11 @@ import { supabase } from '@/lib/supabase'
 import Arena from '@/components/Arena/Arena'
 import DebatePanel from '@/components/Debate/DebatePanel'
 import SupportSection from '@/components/Support/SupportSection'
-import Scoreboard from '@/components/Scoreboard/Scoreboard'
+import RecentActivity from '@/components/Activity/RecentActivity'
 import DebateHistory from '@/components/History/DebateHistory'
 import LiveBadge from '@/components/UI/LiveBadge'
 import Countdown from '@/components/UI/Countdown'
-import type { DebateRound, DebateConclusion } from '@/lib/types'
+import type { DebateRound } from '@/lib/types'
 import type { DBDebateRound, DBUserMessage } from '@/lib/supabase'
 
 // ─── Helpers to map DB rows → app types ──────────────────────────
@@ -73,7 +73,6 @@ export default function Home() {
   const [rounds, setRounds] = useState<DebateRound[]>(MOCK_ROUNDS)
   const [believerMsgCount, setBelieverMsgCount] = useState(0)
   const [skepticMsgCount, setSkepticMsgCount] = useState(0)
-  const [isLive, setIsLive] = useState(false)
 
   const currentRound = rounds[0]
 
@@ -98,7 +97,6 @@ export default function Home() {
 
       if (roundsRes.data && roundsRes.data.length > 0) {
         setRounds(roundsRes.data.map(dbRoundToAppRound))
-        setIsLive(true)
       }
 
       if (messagesRes.data && messagesRes.data.length > 0) {
@@ -108,7 +106,6 @@ export default function Home() {
 
     fetchData()
 
-    // ─── Realtime subscriptions ───────────────────────────────
     const roundsChannel = db
       .channel('debate_rounds')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'debate_rounds' }, (payload) => {
@@ -166,24 +163,12 @@ export default function Home() {
           GOD<span className="title-dot">·</span>DEBATE<span className="title-dot">·</span>ARENA
         </h1>
         <p className="site-tagline">
-          Two autonomous AI agents. One eternal question.
-          <br />
           <span className="tagline-question">Does God exist?</span>
+          {' '}Two autonomous AIs in a live battle.
         </p>
-        <div className="round-status">
-          <span className="round-status-text">Round {currentRound.roundNumber} in progress</span>
-          <span className="round-dot" />
-          <span className="round-status-text">{rounds.length} rounds completed</span>
-          {isLive && (
-            <>
-              <span className="round-dot" />
-              <span className="round-status-text live-indicator">Live data</span>
-            </>
-          )}
-        </div>
       </header>
 
-      {/* Arena */}
+      {/* Arena — characters + support strip */}
       <Arena
         believer={BELIEVER_AGENT}
         skeptic={SKEPTIC_AGENT}
@@ -192,45 +177,34 @@ export default function Home() {
         onSelectSide={handleSelectSide}
       />
 
-      {/* Debate Panel */}
+      {/* Live Exchange — speech cards */}
       <DebatePanel currentRound={currentRound} />
 
-      {/* Support */}
+      {/* Join the Debate — main CTA */}
       <div id="support">
         <SupportSection
           believer={BELIEVER_AGENT}
           skeptic={SKEPTIC_AGENT}
           selectedSide={selectedSide}
           onSelectSide={handleSelectSide}
-          userMessages={userMessages}
           onSubmitMessage={handleSubmitMessage}
           believerMessageCount={believerMsgCount}
           skepticMessageCount={skepticMsgCount}
         />
       </div>
 
-      {/* Scoreboard */}
-      <Scoreboard
-        believer={BELIEVER_AGENT}
-        skeptic={SKEPTIC_AGENT}
-        conclusion={currentRound.conclusion}
-      />
+      {/* Recent activity — 3 items max */}
+      <RecentActivity userMessages={userMessages} />
 
-      {/* History */}
-      <DebateHistory rounds={rounds} userMessages={userMessages} />
+      {/* Previous rounds — all collapsed */}
+      <DebateHistory rounds={rounds} />
 
       {/* Footer */}
       <footer className="site-footer">
         <p className="footer-text">
           GOD·DEBATE·ARENA — An autonomous philosophical experiment powered by z.ai + Base.
-          <br />
-          No gods were harmed in the making of this product.
         </p>
         <div className="footer-links">
-          <span className="footer-link">How it works</span>
-          <span className="footer-sep">·</span>
-          <span className="footer-link">About the agents</span>
-          <span className="footer-sep">·</span>
           <a
             className="footer-link"
             href="https://bridge.base.org"
