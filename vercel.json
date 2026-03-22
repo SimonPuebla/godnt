@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/debate/generate",
+      "schedule": "0,30 * * * *"
+    }
+  ]
+}

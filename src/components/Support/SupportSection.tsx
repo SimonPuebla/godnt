@@ -1,8 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useAccount } from 'wagmi'
 import { Side, Agent, UserMessage } from '@/lib/types'
 import { getMessagePrice, formatPrice, getPriceLadder } from '@/lib/pricing'
+import WalletButton from '@/components/Wallet/WalletButton'
+import CryptoPayment from '@/components/Wallet/CryptoPayment'
 
 interface SupportSectionProps {
   believer: Agent
@@ -25,11 +28,11 @@ export default function SupportSection({
   believerMessageCount,
   skepticMessageCount,
 }: SupportSectionProps) {
+  const { isConnected, address } = useAccount()
   const [text, setText] = useState('')
   const [userName, setUserName] = useState('')
   const [mode, setMode] = useState<'argument' | 'treasury'>('argument')
   const [treasuryAmount, setTreasuryAmount] = useState('10')
-  const [submitted, setSubmitted] = useState(false)
 
   const side = selectedSide ?? 'believer'
   const msgCount = side === 'believer' ? believerMessageCount : skepticMessageCount
@@ -37,30 +40,37 @@ export default function SupportSection({
   const priceLadder = getPriceLadder(msgCount, 4)
   const agent = side === 'believer' ? believer : skeptic
 
-  const handleSubmit = () => {
-    if (mode === 'argument' && text.trim().length < 10) return
-    if (!selectedSide) return
-
+  const handlePaymentSuccess = (txHash: string, amount: number) => {
     onSubmitMessage({
       side,
       content: mode === 'argument' ? text.trim() : '',
-      amount: mode === 'argument' ? nextPrice : parseFloat(treasuryAmount) || 10,
-      userName: userName.trim() || 'anonymous',
+      amount,
+      userName: userName.trim() || address?.slice(0, 8) || 'anonymous',
       isTreasury: mode === 'treasury',
     })
-
     setText('')
-    setSubmitted(true)
-    setTimeout(() => setSubmitted(false), 3000)
   }
+
+  const argumentReady = mode === 'argument' ? text.trim().length >= 10 : true
+  const payAmount = mode === 'argument' ? nextPrice : parseFloat(treasuryAmount) || 10
 
   return (
     <section className="support-section">
       <div className="section-header">
         <h2 className="section-title">Back a Side</h2>
         <p className="section-sub">
-          Send an argument or contribute to the treasury. Your conviction has a price.
+          Pay in USDC on Base. Send an argument or fund the treasury. Conviction has a price.
         </p>
+      </div>
+
+      {/* Wallet connect */}
+      <div className="wallet-row">
+        <WalletButton />
+        {isConnected && (
+          <span className="wallet-network-note">
+            Using USDC on Base · <a className="wallet-link" href="https://bridge.base.org" target="_blank" rel="noopener noreferrer">Bridge ETH to Base ↗</a>
+          </span>
+        )}
       </div>
 
       {/* Side selector */}
@@ -130,7 +140,7 @@ export default function SupportSection({
 
               {/* Price ladder */}
               <div className="price-ladder">
-                <div className="price-ladder-header">Escalating price</div>
+                <div className="price-ladder-header">Escalating price (USDC)</div>
                 <div className="price-rungs">
                   {priceLadder.map((rung, i) => (
                     <div key={rung.n} className={`price-rung ${i === 0 ? 'current' : ''}`}>
@@ -140,23 +150,35 @@ export default function SupportSection({
                   ))}
                 </div>
                 <p className="price-note">
-                  Each message to the same side costs 20% more than your last.
+                  Each message to the same side costs 20% more than your last. Signals conviction.
                 </p>
               </div>
 
-              <button
-                className={`submit-btn ${selectedSide} ${submitted ? 'submitted' : ''}`}
-                onClick={handleSubmit}
-                disabled={text.trim().length < 10 || submitted}
-              >
-                {submitted ? '✓ Argument sent to agent' : `Submit argument — ${formatPrice(nextPrice)}`}
-              </button>
+              {!isConnected ? (
+                <div className="connect-prompt">
+                  <p className="connect-prompt-text">Connect your wallet to submit</p>
+                  <WalletButton />
+                </div>
+              ) : (
+                <CryptoPayment
+                  side={selectedSide}
+                  amountUsdc={nextPrice}
+                  argumentContent={text.trim()}
+                  userName={userName || address?.slice(0, 8) || 'anonymous'}
+                  isTreasury={false}
+                  onSuccess={handlePaymentSuccess}
+                />
+              )}
+
+              {!argumentReady && isConnected && (
+                <p className="input-hint">Write at least 10 characters to submit</p>
+              )}
             </>
           ) : (
             <>
               {/* Treasury contribution */}
               <div className="treasury-form">
-                <label className="input-label">Contribute to {agent.name}&apos;s treasury</label>
+                <label className="input-label">Contribute USDC to {agent.name}&apos;s treasury</label>
                 <div className="treasury-amounts">
                   {['5', '10', '25', '50', '100'].map((amt) => (
                     <button
@@ -177,20 +199,26 @@ export default function SupportSection({
                   min="1"
                 />
                 <p className="treasury-note">
-                  Current treasury: <strong>${agent.treasuryBalance.toLocaleString()}</strong>. The side
-                  with the larger treasury gains a debate advantage multiplier.
+                  Current treasury: <strong>${agent.treasuryBalance.toLocaleString()} USDC</strong>. The side
+                  with the larger treasury gains a debate advantage multiplier in the next round.
                 </p>
               </div>
 
-              <button
-                className={`submit-btn ${selectedSide} ${submitted ? 'submitted' : ''}`}
-                onClick={handleSubmit}
-                disabled={submitted}
-              >
-                {submitted
-                  ? `✓ $${treasuryAmount} sent to ${agent.name}`
-                  : `Contribute $${treasuryAmount} to treasury`}
-              </button>
+              {!isConnected ? (
+                <div className="connect-prompt">
+                  <p className="connect-prompt-text">Connect your wallet to contribute</p>
+                  <WalletButton />
+                </div>
+              ) : (
+                <CryptoPayment
+                  side={selectedSide}
+                  amountUsdc={parseFloat(treasuryAmount) || 10}
+                  argumentContent=""
+                  userName={address?.slice(0, 8) || 'anonymous'}
+                  isTreasury={true}
+                  onSuccess={handlePaymentSuccess}
+                />
+              )}
             </>
           )}
         </div>
@@ -206,7 +234,9 @@ export default function SupportSection({
                 <div className="user-msg-header">
                   <span className={`user-msg-side ${msg.side}`}>→ {msg.side === 'believer' ? 'SERAPH' : 'LOGOS'}</span>
                   <span className="user-msg-user">{msg.userName}</span>
-                  <span className="user-msg-amount">{msg.isTreasury ? `+$${msg.amount} treasury` : formatPrice(msg.amount)}</span>
+                  <span className="user-msg-amount">
+                    {msg.isTreasury ? `+${formatPrice(msg.amount)} treasury` : formatPrice(msg.amount) + ' USDC'}
+                  </span>
                 </div>
                 {!msg.isTreasury && msg.content && (
                   <p className="user-msg-content">&ldquo;{msg.content}&rdquo;</p>

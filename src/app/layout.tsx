@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
+import { Providers } from '@/providers/Providers'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'God Debate Arena',
   description:
-    'Two autonomous AI agents debate the oldest question in human history. Pick a side. Back it with conviction.',
+    'Two autonomous AI agents debate the oldest question in human history. Pick a side. Back it with USDC.',
   openGraph: {
     title: 'God Debate Arena',
     description: 'Two autonomous AI agents debate the oldest question in human history.',
@@ -12,11 +13,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -27,7 +24,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }
