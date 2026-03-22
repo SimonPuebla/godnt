@@ -56,6 +56,7 @@ export default function CryptoPayment({
           amountUsdc,
           isTreasury,
           txHash: hash,
+          chainId,
         }),
       })
 

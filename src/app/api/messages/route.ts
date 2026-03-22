@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServiceSupabase } from '@/lib/supabase'
+import { verifyUSDCTransfer } from '@/lib/verify-tx'
+
+// Read from env to avoid importing browser-only wagmi-config on the server
+const SERVER_TREASURY: Record<string, string> = {
+  believer: process.env.NEXT_PUBLIC_BELIEVER_TREASURY_ADDRESS ?? '',
+  skeptic:  process.env.NEXT_PUBLIC_SKEPTIC_TREASURY_ADDRESS ?? '',
+}
 
 /**
  * POST /api/messages
  * Called after a USDC transaction is confirmed on-chain.
- * Saves the user message and triggers treasury balance update.
- *
- * TODO: Add on-chain tx verification before saving (use viem public client
- * to call getTransactionReceipt and verify the transfer event matches
- * the expected side, amount, and recipient).
+ * Verifies the transfer on-chain with viem before saving to DB.
+ * The message is only recorded once money has actually been received.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -21,10 +25,11 @@ export async function POST(req: NextRequest) {
       amountUsdc,
       isTreasury,
       txHash,
+      chainId,
     } = body
 
     // Basic validation
-    if (!side || !userAddress || !txHash || amountUsdc == null) {
+    if (!side || !userAddress || !txHash || amountUsdc == null || !chainId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -40,16 +45,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Content too long' }, { status: 400 })
     }
 
+    // ─── On-chain verification ──────────────────────────────────────
+    // Confirm money was actually sent before saving the message
+    const treasuryAddress = SERVER_TREASURY[side]
+    const verification = await verifyUSDCTransfer(
+      txHash,
+      chainId,
+      userAddress,
+      treasuryAddress,
+      amountUsdc
+    )
+
+    if (!verification.ok) {
+      console.warn('[/api/messages] tx verification failed:', verification.error, { txHash, side, amountUsdc })
+      return NextResponse.json(
+        { error: `Transaction verification failed: ${verification.error}` },
+        { status: 400 }
+      )
+    }
+
     const db = getServiceSupabase()
 
     if (!db) {
       // No Supabase configured — return success in dev mode
       return NextResponse.json({ success: true, mock: true })
     }
-
-    // TODO: Verify tx_hash on-chain with viem before saving
-    // const verified = await verifyUSDCTransfer(txHash, side, amountUsdc, userAddress)
-    // if (!verified) return NextResponse.json({ error: 'Invalid transaction' }, { status: 400 })
 
     // Get current round number
     const { data: latestRound } = await db
@@ -67,7 +87,7 @@ export async function POST(req: NextRequest) {
       amount_usdc: amountUsdc,
       is_treasury: isTreasury ?? false,
       tx_hash: txHash.toLowerCase(),
-      tx_verified: true, // TODO: set to false until verified
+      tx_verified: true,
       round_number: latestRound?.round_number ?? null,
     })
 

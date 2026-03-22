@@ -1,8 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/debate/generate",
-      "schedule": "0,30 * * * *"
+      "path": "/api/cron/debate",
+      "schedule": "*/30 * * * *"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/debate/generate/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cron/debate/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }
