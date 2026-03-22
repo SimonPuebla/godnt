@@ -1,0 +1,56 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: ['claude/god-debate-arena-M937t', 'main']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build static export
+        run: npm run build
+        env:
+          GITHUB_PAGES: 'true'
+          NEXT_PUBLIC_SUPABASE_URL: https://ezmgtbsectbxpxgeasnp.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_989-HhwVpLSPXPiv90uasA_B1vjN0-4
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: 66405cf2e23dc354f878a179b80aff81
+          NEXT_PUBLIC_BELIEVER_TREASURY_ADDRESS: '0x799a48B51398430cD021f272CB2fA73B99F941c4'
+          NEXT_PUBLIC_SKEPTIC_TREASURY_ADDRESS: '0x99B23203729e379553cC0d419da9aad3Ac132c63'
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
