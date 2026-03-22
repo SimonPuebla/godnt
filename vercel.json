@@ -2,7 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/debate",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/debate",
+      "schedule": "0 21 * * *"
     }
   ],
   "functions": {
