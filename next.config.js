@@ -5,6 +5,7 @@ const nextConfig = {
   // Static export for GitHub Pages preview deployments
   ...(isGitHubPages && {
     output: 'export',
+    distDir: 'docs',
     basePath: '/godnt',
     assetPrefix: '/godnt/',
     images: { unoptimized: true },
