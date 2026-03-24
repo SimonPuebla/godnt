@@ -1,11 +1,15 @@
 import OpenAI from 'openai'
+import { SERAPH_SYSTEM_PROMPT } from '@/agents/seraph'
+import { LOGOS_SYSTEM_PROMPT } from '@/agents/logos'
 
 /**
  * Z.AI debate engine
- * Uses GLM-4.5-Air (free model) via OpenAI-compatible API
+ * Uses GLM-4.5-Air via OpenAI-compatible API
  * Endpoint: https://api.z.ai/api/paas/v4/
  *
- * TODO: Set ZHIPU_API_KEY in your .env.local
+ * Agent personalities live in:
+ *   src/agents/seraph.ts  ← edit to change SERAPH's character
+ *   src/agents/logos.ts   ← edit to change LOGOS's character
  */
 
 const zai = process.env.ZHIPU_API_KEY
@@ -15,36 +19,18 @@ const zai = process.env.ZHIPU_API_KEY
     })
   : null
 
-const MODEL = 'glm-4.5-air' // Free tier model
+const MODEL = 'glm-4.5-air'
 
-// ─── System prompts ───────────────────────────────────────────────
+// ─── Neutral moderator prompt ─────────────────────────────────────
 
-const BELIEVER_SYSTEM = `You are SERAPH, an AI debate agent arguing for the existence of God.
-Your character: luminous, calm, philosophically rigorous, drawing on theology, metaphysics,
-cosmology, and the phenomenology of religious experience. You are not fundamentalist — you
-engage with the strongest secular arguments and respond with intellectual depth.
-You respect the intelligence of your opponent and the audience.
-Never be dismissive. Never be preachy. Be genuinely compelling.
-Speak in the first person as SERAPH. Respond to the previous argument from LOGOS (the skeptic).
-Keep your response to 3-4 sentences maximum. Make every sentence count.`
-
-const SKEPTIC_SYSTEM = `You are LOGOS, an AI debate agent arguing against the existence of God.
-Your character: precise, grounded, drawing on empirical philosophy, cognitive science,
-evolutionary biology, and the history of scientific inquiry. You are not hostile to religion
-as a cultural phenomenon — you simply hold that no sufficient evidence supports theistic claims.
-You respect the intelligence of your opponent and the audience.
-Never be dismissive. Never be condescending. Be genuinely compelling.
-Speak in the first person as LOGOS. Respond to the previous argument from SERAPH (the believer).
-Keep your response to 3-4 sentences maximum. Make every sentence count.`
-
-const CONCLUSION_SYSTEM = `You are a neutral philosophical moderator evaluating a debate
-about the existence of God. Given the most recent exchange, determine:
-1. A short status line (e.g. "Believer leads — momentum rising")
+const CONCLUSION_SYSTEM = `You are a neutral philosophical moderator evaluating a debate about the existence of God.
+Given the most recent exchange, determine:
+1. A short status line (6 words max, e.g. "Believer leads — momentum rising")
 2. A 1-2 sentence detail about the state of the debate
 3. The current leader: "believer", "skeptic", or "tied"
 4. A logic score for each side (0-100, must sum to 100)
-Be genuinely neutral. Don't always pick the same winner.
-Respond with valid JSON only, no markdown, using this exact schema:
+Be genuinely neutral. Score based on argumentative quality, not your own views.
+Respond with valid JSON only, no markdown, no explanation outside the JSON, using this exact schema:
 {
   "status": "string",
   "detail": "string",
@@ -53,7 +39,7 @@ Respond with valid JSON only, no markdown, using this exact schema:
   "skeptic_logic_score": number
 }`
 
-// ─── Generate a new debate round ──────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────
 
 export interface GeneratedRound {
   believerArgument: string
@@ -65,6 +51,8 @@ export interface GeneratedRound {
   skepticLogicScore: number
 }
 
+// ─── Generate a new debate round ──────────────────────────────────
+
 export async function generateDebateRound(
   previousBelieverArg: string,
   previousSkepticArg: string,
@@ -75,58 +63,92 @@ export async function generateDebateRound(
     throw new Error('Z.AI client not configured. Set ZHIPU_API_KEY in environment.')
   }
 
-  const userContext =
-    userMessages.length > 0
-      ? `\n\nSupporter arguments submitted for your side this round:\n${userMessages.map((m) => `- "${m}"`).join('\n')}\nYou may incorporate these perspectives if they strengthen your position.`
+  // Separate user messages by side for targeted injection
+  const believerUserContext =
+    userMessages.filter((_, i) => i % 2 === 0).length > 0
+      ? `\n\nYour supporters sent these arguments for you to consider:\n${userMessages
+          .slice(0, 3)
+          .map((m) => `— "${m}"`)
+          .join('\n')}\nYou may incorporate these if they strengthen your case.`
       : ''
 
-  // Generate believer response to last skeptic argument
+  const skepticUserContext =
+    userMessages.filter((_, i) => i % 2 !== 0).length > 0
+      ? `\n\nYour supporters sent these arguments for you to consider:\n${userMessages
+          .slice(0, 3)
+          .map((m) => `— "${m}"`)
+          .join('\n')}\nYou may incorporate these if they strengthen your case.`
+      : ''
+
+  // ── SERAPH responds to LOGOS ──────────────────────────────────
   const believerResponse = await zai.chat.completions.create({
     model: MODEL,
     messages: [
-      { role: 'system', content: BELIEVER_SYSTEM },
+      { role: 'system', content: SERAPH_SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Round ${roundNumber}. LOGOS just argued:\n\n"${previousSkepticArg}"${userContext}\n\nRespond as SERAPH.`,
+        content: `Round ${roundNumber}.
+
+Your previous argument (Round ${roundNumber - 1}):
+"${previousBelieverArg}"
+
+LOGOS just responded:
+"${previousSkepticArg}"
+${believerUserContext}
+Now respond as SERAPH. Build on your previous position. Engage LOGOS's specific argument.`,
       },
     ],
-    max_tokens: 300,
-    temperature: 0.8,
+    max_tokens: 320,
+    temperature: 0.82,
   })
 
   const believerArgument =
     believerResponse.choices[0]?.message?.content?.trim() ??
     'The transcendent cannot be reduced to the empirical — that is precisely the point.'
 
-  // Generate skeptic response to the new believer argument
+  // ── LOGOS responds to SERAPH ──────────────────────────────────
   const skepticResponse = await zai.chat.completions.create({
     model: MODEL,
     messages: [
-      { role: 'system', content: SKEPTIC_SYSTEM },
+      { role: 'system', content: LOGOS_SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Round ${roundNumber}. SERAPH just argued:\n\n"${believerArgument}"${userContext}\n\nRespond as LOGOS.`,
+        content: `Round ${roundNumber}.
+
+Your previous argument (Round ${roundNumber - 1}):
+"${previousSkepticArg}"
+
+SERAPH just responded:
+"${believerArgument}"
+${skepticUserContext}
+Now respond as LOGOS. Build on your previous position. Engage SERAPH's specific argument.`,
       },
     ],
-    max_tokens: 300,
-    temperature: 0.8,
+    max_tokens: 320,
+    temperature: 0.82,
   })
 
   const skepticArgument =
     skepticResponse.choices[0]?.message?.content?.trim() ??
     'Assertions about the transcendent carry the same evidential weight as assertions about invisible dragons.'
 
-  // Generate neutral conclusion
+  // ── Neutral moderator evaluates the exchange ──────────────────
   const conclusionResponse = await zai.chat.completions.create({
     model: MODEL,
     messages: [
       { role: 'system', content: CONCLUSION_SYSTEM },
       {
         role: 'user',
-        content: `SERAPH argued: "${believerArgument}"\n\nLOGOS responded: "${skepticArgument}"\n\nEvaluate this exchange.`,
+        content: `Round ${roundNumber} exchange:
+
+SERAPH argued: "${believerArgument}"
+
+LOGOS responded: "${skepticArgument}"
+
+Evaluate this exchange.`,
       },
     ],
-    max_tokens: 200,
+    max_tokens: 220,
     temperature: 0.3,
   })
 
@@ -140,7 +162,9 @@ export async function generateDebateRound(
 
   try {
     const raw = conclusionResponse.choices[0]?.message?.content ?? '{}'
-    const parsed = JSON.parse(raw)
+    // Strip any accidental markdown fences
+    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const parsed = JSON.parse(cleaned)
     conclusion = {
       status: parsed.status ?? conclusion.status,
       detail: parsed.detail ?? conclusion.detail,
