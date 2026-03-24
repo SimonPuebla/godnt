@@ -530,12 +530,13 @@ body {
 .exchange-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 24px;
 }
 
 @media (max-width: 640px) {
   .exchange-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 }
 
@@ -543,11 +544,49 @@ body {
   border: 1px solid var(--border);
   padding: 20px;
   background: var(--bg2);
+  position: relative;
   animation: float-up 0.5s ease both;
 }
 
-.speech-card.believer { border-left: 3px solid var(--b-color); }
-.speech-card.skeptic { border-left: 3px solid var(--s-color); }
+/* Believer: accent on left (outer edge) */
+.speech-card.believer {
+  border-left: 3px solid var(--b-color);
+}
+
+/* Skeptic: accent on right (outer edge) — mirrored */
+.speech-card.skeptic {
+  border-right: 3px solid var(--s-color);
+  border-left: 1px solid var(--border);
+}
+
+/* Bubble tails — desktop only, pointing toward each other */
+@media (min-width: 641px) {
+  /* SERAPH tail → points RIGHT toward LOGOS */
+  .speech-card.believer::after {
+    content: '';
+    position: absolute;
+    top: 22px;
+    right: -12px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-left: 12px solid var(--b-color);
+  }
+
+  /* LOGOS tail → points LEFT toward SERAPH */
+  .speech-card.skeptic::after {
+    content: '';
+    position: absolute;
+    top: 22px;
+    left: -12px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-right: 12px solid var(--s-color);
+  }
+}
 
 .speech-agent {
   font-family: var(--pixel-font);
@@ -565,6 +604,13 @@ body {
   font-size: 13px;
   line-height: 1.78;
   color: var(--text);
+}
+
+.speech-time {
+  display: block;
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--text-dimmer);
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -640,6 +686,16 @@ body {
 .spb-role {
   font-size: 11px;
   color: var(--text-dim);
+}
+
+.spb-thesis {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 11px;
+  color: var(--text-dimmer);
+  margin-top: 6px;
+  display: block;
+  line-height: 1.5;
 }
 
 /* Join form */

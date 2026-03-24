@@ -79,15 +79,17 @@ export default function SupportSection({
           className={`side-pick-btn believer ${selectedSide === 'believer' ? 'active' : ''}`}
           onClick={() => { onSelectSide('believer'); setMode('argument'); setSubmitted(false) }}
         >
-          <span className="spb-name">SERAPH</span>
-          <span className="spb-role">Believer</span>
+          <span className="spb-name">{believer.name}</span>
+          <span className="spb-role">{believer.title}</span>
+          <span className="spb-thesis">&ldquo;{believer.currentThesis.split('. ')[0]}.&rdquo;</span>
         </button>
         <button
           className={`side-pick-btn skeptic ${selectedSide === 'skeptic' ? 'active' : ''}`}
           onClick={() => { onSelectSide('skeptic'); setMode('argument'); setSubmitted(false) }}
         >
-          <span className="spb-name">LOGOS</span>
-          <span className="spb-role">Skeptic</span>
+          <span className="spb-name">{skeptic.name}</span>
+          <span className="spb-role">{skeptic.title}</span>
+          <span className="spb-thesis">&ldquo;{skeptic.currentThesis.split('. ')[0]}.&rdquo;</span>
         </button>
       </div>
 

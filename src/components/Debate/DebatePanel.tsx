@@ -12,6 +12,13 @@ function getEdgeLabel(conclusion: DebateRound['conclusion']): { text: string; si
   return { text: 'Skeptic pressing harder', side: 'skeptic' }
 }
 
+function relativeTime(date: Date): string {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+}
+
 export default function DebatePanel({ currentRound }: DebatePanelProps) {
   const edge = getEdgeLabel(currentRound.conclusion)
 
@@ -27,10 +34,12 @@ export default function DebatePanel({ currentRound }: DebatePanelProps) {
         <div className="speech-card believer">
           <span className="speech-agent believer">SERAPH</span>
           <p className="speech-text">&ldquo;{currentRound.believerArgument.content}&rdquo;</p>
+          <span className="speech-time">{relativeTime(currentRound.believerArgument.timestamp)}</span>
         </div>
         <div className="speech-card skeptic">
           <span className="speech-agent skeptic">LOGOS</span>
           <p className="speech-text">&ldquo;{currentRound.skepticArgument.content}&rdquo;</p>
+          <span className="speech-time">{relativeTime(currentRound.skepticArgument.timestamp)}</span>
         </div>
       </div>
     </section>
